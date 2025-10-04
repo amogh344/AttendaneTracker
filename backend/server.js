@@ -12,6 +12,14 @@ app.use(express.json());
 
 // --- MongoDB Connection ---
 const mongoURI = process.env.MONGODB_URI;
+
+// Add a check to ensure the connection string is present before attempting to connect
+if (!mongoURI) {
+    console.error("FATAL ERROR: The MONGODB_URI environment variable is not defined.");
+    console.error("Please create a .env file in the 'backend' directory and add your MongoDB connection string.");
+    process.exit(1); // Exit the application with a failure code
+}
+
 mongoose.connect(mongoURI)
   .then(() => console.log('MongoDB connected successfully'))
   .catch(err => console.error('MongoDB connection error:', err));
