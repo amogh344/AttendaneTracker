@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Attendance Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: 0.8fr repeat(10, 1fr); /* Adjust first column width for day names */
+            gap: 1px;
+        }
+        .schedule-grid > div {
+            padding: 0.5rem;
+            text-align: center;
+            font-size: 0.875rem;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .swapping {
+            cursor: copy;
+            outline: 2px dashed #3b82f6; /* Blue-500 */
+        }
+        .swapping .class-cell:hover {
+            background-color: #dbeafe; /* Blue-100 */
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div id="app" class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- App Header -->
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold text-gray-900">Student Attendance Portal</h1>
+            <p id="week-title" class="text-lg text-gray-600 mt-2">Your weekly attendance dashboard.</p>
+        </header>
+
+        <!-- Loading State -->
+        <div id="loading-state" class="text-center py-10">
+            <div class="loader mx-auto"></div>
+            <p class="mt-4 text-gray-600">Connecting to server...</p>
+        </div>
+
+        <div id="app-content" class="hidden">
+            <!-- Attendance Summary -->
+            <div id="attendance-summary" class="mb-8 bg-white p-6 rounded-lg shadow-md">
+                <h3 class="text-xl font-semibold mb-4">Attendance Summary</h3>
+                <div id="summary-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    <!-- Summary cards will be rendered here -->
+                </div>
+            </div>
+
+            <!-- Main Content Area -->
+            <main id="main-content">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-xl font-semibold mb-4">This Week's Schedule & Attendance</h3>
+                    <div id="student-schedule-container" class="bg-gray-50 p-4 rounded-lg">
+                        <!-- Schedule will be rendered here -->
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Class Action Modal -->
+        <div id="class-action-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+            <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <h3 class="text-2xl text-center leading-6 font-bold text-gray-900" id="modal-title">Class Action</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-center text-gray-500" id="modal-subtitle"></p>
+                    </div>
+                    <div class="mt-4 space-y-3 px-4">
+                        <button id="mark-present" class="w-full px-4 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-300">Mark as Present</button>
+                        <button id="mark-absent" class="w-full px-4 py-3 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition duration-300">Mark as Absent</button>
+                        <button id="mark-cancelled" class="w-full px-4 py-3 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition duration-300">Mark as Cancelled</button>
+                        <button id="initiate-swap" class="w-full px-4 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-300">Swap Class</button>
+                    </div>
+                    <div class="items-center px-4 py-3 mt-4">
+                        <button id="close-modal" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // --- API Configuration ---
+        // Replace this URL with your deployed backend URL from Render
+        // const API_URL = 'https://attendance-backend.onrender.com/api/data'; 
+        // For local testing, use: 
+        const API_URL = 'http://localhost:5001/api/data';
+
+        // --- STATE MANAGEMENT ---
+        let studentSchedule = {};
+        let attendanceRecords = {};
+        let swapState = { active: false, source: null };
+
+        // --- CORE FUNCTIONS ---
+        function getStatusColor(status) {
+            switch (status) {
+                case 'present': return 'bg-green-100 border-green-400 text-green-800';
+                case 'absent': return 'bg-red-100 border-red-400 text-red-800';
+                case 'cancelled': return 'bg-gray-200 border-gray-400 text-gray-600 line-through';
+                default: return 'bg-white';
+            }
+        }
+
+        function renderAttendanceSummary() {
+            const container = document.getElementById('summary-grid');
+            if(!container || !studentSchedule.rows) return;
+            container.innerHTML = '';
+
+            const subjects = [...new Set(studentSchedule.rows.flatMap(row => row.slice(1)).filter(item => item && !['Tea Break', 'Lunch Break'].includes(item)))];
+            subjects.forEach(subject => {
+                let totalClasses = 0;
+                let presentClasses = 0;
+                studentSchedule.rows.forEach(row => {
+                    const day = row[0];
+                    const classItems = row.slice(1);
+                    for (let timeIndex = 0; timeIndex < classItems.length; timeIndex++) {
+                        const item = classItems[timeIndex];
+                        if (item === subject) {
+                            totalClasses++;
+                            const timeSlot = studentSchedule.headers[timeIndex + 1];
+                            const record = attendanceRecords[day]?.[timeSlot];
+                            if (record && record.status === 'present') {
+                                presentClasses++;
+                            }
+                            if (timeIndex + 1 < classItems.length && classItems[timeIndex + 1] === item) {
+                                timeIndex++; 
+                            }
+                        }
+                    }
+                });
+
+                const percentage = totalClasses > 0 ? ((presentClasses / totalClasses) * 100) : 0;
+                const summaryCard = document.createElement('div');
+                const percentageColor = percentage >= 75 ? 'bg-green-100' : (percentage >= 50 ? 'bg-yellow-100' : 'bg-red-100');
+                const textColor = percentage >= 75 ? 'text-green-800' : (percentage >= 50 ? 'text-yellow-800' : 'text-red-800');
+                const progressBarColor = percentage >= 75 ? 'bg-green-500' : (percentage >= 50 ? 'bg-yellow-500' : 'bg-red-500');
+
+                summaryCard.className = `p-4 rounded-lg transition-all duration-300 ${percentageColor} ${textColor}`;
+                summaryCard.innerHTML = `<div class="font-bold text-lg">${subject}</div><div class="text-sm font-semibold mt-1">${presentClasses} / ${totalClasses} Attended</div><div class="w-full bg-gray-300 rounded-full h-2 mt-2"><div class="${progressBarColor} h-2 rounded-full" style="width: ${percentage.toFixed(0)}%"></div></div>`;
+                container.appendChild(summaryCard);
+            });
+            if (subjects.length === 0) container.innerHTML = '<p class="col-span-full text-gray-500">No subjects found in schedule.</p>';
+        }
+        
+        function renderStudentSchedule() {
+            if (!studentSchedule.rows) return;
+            const container = document.getElementById('student-schedule-container');
+            container.innerHTML = '';
+            const grid = document.createElement('div');
+            grid.className = 'schedule-grid border border-gray-200 bg-gray-200 rounded-lg overflow-hidden';
+
+            studentSchedule.headers.forEach(header => {
+                const cell = document.createElement('div');
+                cell.className = 'bg-gray-100 font-bold text-gray-700 p-2';
+                cell.textContent = header;
+                grid.appendChild(cell);
+            });
+
+            studentSchedule.rows.forEach((row, dayIndex) => {
+                const dayCell = document.createElement('div');
+                dayCell.className = 'font-semibold bg-gray-50 flex flex-col items-center justify-center p-2';
+                dayCell.innerHTML = `<span>${row[0]}</span><button class="mt-2 text-xs bg-indigo-500 text-white rounded-full px-2 py-1 hover:bg-indigo-600">Mark Day</button>`;
+                dayCell.querySelector('button').onclick = (e) => { e.stopPropagation(); markFullDay(row[0]); };
+                grid.appendChild(dayCell);
+                
+                const classItems = row.slice(1);
+                for (let timeIndex = 0; timeIndex < classItems.length; timeIndex++) {
+                    const item = classItems[timeIndex];
+                    const cell = document.createElement('div');
+
+                    if (!item) { cell.className = 'bg-white'; grid.appendChild(cell); continue; }
+                    
+                    const day = row[0];
+                    const timeSlot = studentSchedule.headers[timeIndex + 1];
+                    let colSpan = 1;
+                    if (item === classItems[timeIndex + 1] && !['Tea Break', 'Lunch Break'].includes(item)) {
+                        colSpan = 2;
+                        cell.style.gridColumn = 'span 2';
+                    }
+
+                    const attendance = attendanceRecords[day]?.[timeSlot] || {};
+                    cell.className = `class-cell ${getStatusColor(attendance.status)}`;
+                    
+                    if (item && !['Tea Break', 'Lunch Break'].includes(item)) {
+                        cell.classList.add('cursor-pointer', 'hover:bg-blue-100', 'transition', 'duration-200');
+                        cell.onclick = () => handleCellClick(item, day, timeSlot, colSpan);
+                    } else if (['Tea Break', 'Lunch Break'].includes(item)) {
+                         cell.className = 'bg-gray-100 font-medium text-gray-500';
+                    }
+                    cell.textContent = item;
+                    grid.appendChild(cell);
+                    if (colSpan > 1) timeIndex++;
+                }
+            });
+
+            container.appendChild(grid);
+            renderAttendanceSummary();
+        }
+
+        function handleCellClick(subject, day, timeSlot, colSpan = 1) {
+            if (swapState.active) {
+                if (swapState.source.day === day && swapState.source.timeSlot === timeSlot) {
+                    document.body.classList.remove('swapping');
+                    swapState = { active: false, source: null };
+                    alert('Swap cancelled.');
+                } else {
+                    completeSwap(day, timeSlot);
+                }
+            } else {
+                openClassActionModal(subject, day, timeSlot, colSpan);
+            }
+        }
+        
+        function openClassActionModal(subject, day, timeSlot, colSpan = 1) {
+            document.getElementById('modal-title').textContent = subject;
+            document.getElementById('modal-subtitle').textContent = `${day} at ${timeSlot}`;
+            document.getElementById('mark-present').onclick = () => updateClassStatus(day, timeSlot, 'present', colSpan);
+            document.getElementById('mark-absent').onclick = () => updateClassStatus(day, timeSlot, 'absent', colSpan);
+            document.getElementById('mark-cancelled').onclick = () => updateClassStatus(day, timeSlot, 'cancelled', colSpan);
+            document.getElementById('initiate-swap').onclick = () => initiateSwap(subject, day, timeSlot);
+            document.getElementById('class-action-modal').classList.remove('hidden');
+        }
+
+        function updateClassStatus(day, timeSlot, status, colSpan = 1) {
+            if (!attendanceRecords[day]) attendanceRecords[day] = {};
+            const startTimeIndex = studentSchedule.headers.indexOf(timeSlot);
+            for (let i = 0; i < colSpan; i++) {
+                const currentTimeSlot = studentSchedule.headers[startTimeIndex + i];
+                if (currentTimeSlot) attendanceRecords[day][currentTimeSlot] = { status };
+            }
+            closeModal();
+            renderStudentSchedule();
+            saveData();
+        }
+
+        function markFullDay(day) {
+            if (!attendanceRecords[day]) attendanceRecords[day] = {};
+            const dayRow = studentSchedule.rows.find(r => r[0] === day);
+            dayRow.slice(1).forEach((item, index) => {
+                if (item && !['Tea Break', 'Lunch Break'].includes(item)) {
+                    const timeSlot = studentSchedule.headers[index + 1];
+                    attendanceRecords[day][timeSlot] = { status: 'present' };
+                }
+            });
+            renderStudentSchedule();
+            saveData();
+        }
+
+        function initiateSwap(subject, day, timeSlot) {
+            swapState = { active: true, source: { subject, day, timeSlot } };
+            document.body.classList.add('swapping');
+            closeModal();
+            alert('Swap initiated. Now click on the class you want to swap with.');
+        }
+        
+        function completeSwap(toDay, toTimeSlot) {
+            const from = swapState.source;
+            const fromDayIndex = studentSchedule.rows.findIndex(r => r[0] === from.day);
+            const fromTimeIndex = studentSchedule.headers.indexOf(from.timeSlot);
+            const toDayIndex = studentSchedule.rows.findIndex(r => r[0] === toDay);
+            const toTimeIndex = studentSchedule.headers.indexOf(toTimeSlot);
+
+            if (fromDayIndex === -1 || fromTimeIndex === -1 || toDayIndex === -1 || toTimeIndex === -1) {
+                console.error("Swap failed: Invalid indices"); return;
+            }
+
+            const fromSubject = studentSchedule.rows[fromDayIndex][fromTimeIndex];
+            const toSubject = studentSchedule.rows[toDayIndex][toTimeIndex];
+            studentSchedule.rows[fromDayIndex][fromTimeIndex] = toSubject;
+            studentSchedule.rows[toDayIndex][toTimeIndex] = fromSubject;
+            
+            if (!attendanceRecords[from.day]) attendanceRecords[from.day] = {};
+            if (!attendanceRecords[toDay]) attendanceRecords[toDay] = {};
+            const fromAttendance = attendanceRecords[from.day][from.timeSlot];
+            const toAttendance = attendanceRecords[toDay][toTimeSlot];
+            attendanceRecords[from.day][from.timeSlot] = toAttendance;
+            attendanceRecords[toDay][toTimeSlot] = fromAttendance;
+
+            swapState = { active: false, source: null };
+            document.body.classList.remove('swapping');
+            alert(`Swapped "${fromSubject}" with "${toSubject}".`);
+            renderStudentSchedule();
+            saveData();
+        }
+
+        function closeModal() {
+            document.getElementById('class-action-modal').classList.add('hidden');
+        }
+
+        // --- DATA HANDLING ---
+        async function loadInitialData() {
+            try {
+                const loadingState = document.getElementById('loading-state');
+                const appContent = document.getElementById('app-content');
+                
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error(`Failed to fetch data: ${response.statusText}`);
+                
+                const data = await response.json();
+                studentSchedule = data.schedule;
+                attendanceRecords = data.attendance || {};
+                
+                loadingState.classList.add('hidden');
+                appContent.classList.remove('hidden');
+                renderStudentSchedule();
+            } catch (error) {
+                console.error("Could not load data from backend:", error);
+                document.getElementById('loading-state').innerHTML = `<p class="text-red-500">Error connecting to the server. Please check the API_URL and make sure your backend is running.</p>`;
+            }
+        }
+        
+        async function saveData() {
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        schedule: studentSchedule, 
+                        attendance: attendanceRecords 
+                    }),
+                });
+            } catch (error) {
+                console.error("Failed to save data:", error);
+                alert("Could not save changes to the server.");
+            }
+        }
+
+        // --- INITIALIZATION ---
+        loadInitialData();
+        document.getElementById('close-modal').onclick = closeModal;
+    </script>
+</body>
+</html>
+
