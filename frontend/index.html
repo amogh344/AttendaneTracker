@@ -4,114 +4,118 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Attendance Portal</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" xintegrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
         }
-        .schedule-grid {
-            display: grid;
-            grid-template-columns: 0.8fr repeat(10, 1fr); /* Adjust first column width for day names */
-            gap: 1px;
-        }
-        .schedule-grid > div {
-            padding: 0.5rem;
+        .schedule-table th, .schedule-table td {
+            vertical-align: middle;
             text-align: center;
-            font-size: 0.875rem;
             min-height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            font-size: 0.9rem;
+        }
+        .class-cell {
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .class-cell:hover {
+            background-color: #e9ecef;
         }
         .swapping {
             cursor: copy;
-            outline: 2px dashed #3b82f6; /* Blue-500 */
         }
         .swapping .class-cell:hover {
-            background-color: #dbeafe; /* Blue-100 */
+            outline: 2px dashed #0d6efd;
         }
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 2s linear infinite;
+        .day-header {
+            font-weight: 600;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .btn-day {
+            font-size: 0.75rem;
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body>
 
-    <div id="app" class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+    <div id="app" class="container my-5">
         <!-- App Header -->
-        <header class="mb-6 text-center">
-            <h1 class="text-4xl font-bold text-gray-900">Student Attendance Portal</h1>
+        <header class="mb-5 text-center">
+            <h1 class="display-4 fw-bold">Student Attendance Portal</h1>
             <!-- Week Navigation -->
-            <div class="mt-4 flex items-center justify-center space-x-4">
-                <button id="prev-week" class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 transition">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            <div class="mt-4 d-flex align-items-center justify-content-center gap-3">
+                <button id="prev-week" class="btn btn-light rounded-pill p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-chevron-left" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>
                 </button>
-                <h2 id="week-title" class="text-xl font-semibold text-gray-700 w-64 text-center"></h2>
-                <button id="next-week" class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 transition">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                <h2 id="week-title" class="h4 fw-semibold m-0" style="width: 280px;"></h2>
+                <button id="next-week" class="btn btn-light rounded-pill p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-chevron-right" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>
                 </button>
             </div>
-             <button id="today-btn" class="mt-2 text-sm text-indigo-600 hover:underline">Go to Today</button>
+             <button id="today-btn" class="btn btn-link mt-2">Go to Today</button>
         </header>
 
         <!-- Loading State -->
-        <div id="loading-state" class="text-center py-10">
-            <div class="loader mx-auto"></div>
-            <p class="mt-4 text-gray-600">Connecting to server...</p>
+        <div id="loading-state" class="text-center py-5">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Connecting to server...</p>
         </div>
 
-        <div id="app-content" class="hidden">
+        <div id="app-content" class="d-none">
             <!-- Attendance Summary -->
-            <div id="attendance-summary" class="mb-8 bg-white p-6 rounded-lg shadow-md">
-                <h3 class="text-xl font-semibold mb-4">Attendance Summary</h3>
-                <div id="summary-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    <!-- Summary cards will be rendered here -->
+            <div id="attendance-summary" class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h3 class="card-title mb-4">Attendance Summary</h3>
+                    <div id="summary-grid" class="row g-3">
+                        <!-- Summary cards will be rendered here -->
+                    </div>
                 </div>
             </div>
 
             <!-- Main Content Area -->
             <main id="main-content">
-                <div class="bg-white p-6 rounded-lg shadow-md">
-                    <h3 class="text-xl font-semibold mb-4">Weekly Schedule & Attendance</h3>
-                    <div id="student-schedule-container" class="bg-gray-50 p-4 rounded-lg">
-                        <!-- Schedule will be rendered here -->
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h3 class="card-title mb-4">Weekly Schedule & Attendance</h3>
+                        <div id="student-schedule-container" class="table-responsive">
+                            <!-- Schedule will be rendered here -->
+                        </div>
                     </div>
                 </div>
             </main>
         </div>
 
         <!-- Class Action Modal -->
-        <div id="class-action-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
-            <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-                <div class="mt-3">
-                    <h3 class="text-2xl text-center leading-6 font-bold text-gray-900" id="modal-title">Class Action</h3>
-                    <div class="mt-2 px-7 py-3">
-                        <p class="text-sm text-center text-gray-500" id="modal-subtitle"></p>
+        <div class="modal fade" id="class-action-modal" tabindex="-1" aria-labelledby="modal-title" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header text-center">
+                        <h5 class="modal-title w-100 h3" id="modal-title">Class Action</h5>
                     </div>
-                    <div class="mt-4 space-y-3 px-4">
-                        <button id="mark-present" class="w-full px-4 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-300">Mark as Present</button>
-                        <button id="mark-absent" class="w-full px-4 py-3 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition duration-300">Mark as Absent</button>
-                        <button id="mark-cancelled" class="w-full px-4 py-3 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition duration-300">Mark as Cancelled</button>
-                        <button id="initiate-swap" class="w-full px-4 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-300">Swap Class</button>
+                    <div class="modal-body">
+                        <p class="text-center text-muted" id="modal-subtitle"></p>
+                        <div class="d-grid gap-3 mt-4">
+                            <button id="mark-present" class="btn btn-success btn-lg">Mark as Present</button>
+                            <button id="mark-absent" class="btn btn-danger btn-lg">Mark as Absent</button>
+                            <button id="mark-cancelled" class="btn btn-secondary btn-lg">Mark as Cancelled</button>
+                            <button id="initiate-swap" class="btn btn-primary btn-lg">Swap Class</button>
+                        </div>
                     </div>
-                    <div class="items-center px-4 py-3 mt-4">
-                        <button id="close-modal" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">Close</button>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light w-100" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
     
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
     <script>
         // --- API Configuration ---
         const API_URL = 'https://attendance-backend-5lpu.onrender.com/api/data';
@@ -120,14 +124,15 @@
         let studentSchedule = {};
         let attendanceRecords = {};
         let swapState = { active: false, source: null };
-        let currentDate = new Date(); // The date used to determine the current week
-        let currentWeekId = ''; // e.g., "2025-10-27"
+        let currentDate = new Date();
+        let currentWeekId = '';
+        let classActionModal; // To hold Bootstrap modal instance
 
         // --- DATE HELPER FUNCTIONS ---
         function getMonday(d) {
             d = new Date(d);
             const day = d.getDay(),
-                diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+                diff = d.getDate() - day + (day === 0 ? -6 : 1);
             return new Date(d.setDate(diff));
         }
 
@@ -150,16 +155,16 @@
         // --- CORE FUNCTIONS ---
         function getStatusColor(status) {
             switch (status) {
-                case 'present': return 'bg-green-100 border-green-400 text-green-800';
-                case 'absent': return 'bg-red-100 border-red-400 text-red-800';
-                case 'cancelled': return 'bg-gray-200 border-gray-400 text-gray-600 line-through';
-                default: return 'bg-white';
+                case 'present': return 'table-success';
+                case 'absent': return 'table-danger';
+                case 'cancelled': return 'text-muted text-decoration-line-through';
+                default: return '';
             }
         }
 
         function renderAttendanceSummary() {
             const container = document.getElementById('summary-grid');
-            if(!container || !studentSchedule.rows) return;
+            if (!container || !studentSchedule.rows) return;
             container.innerHTML = '';
 
             const subjects = [...new Set(studentSchedule.rows.flatMap(row => row.slice(1)).filter(item => item && !['Tea Break', 'Lunch Break'].includes(item)))];
@@ -168,88 +173,96 @@
                 let presentClasses = 0;
                 studentSchedule.rows.forEach(row => {
                     const day = row[0];
-                    const classItems = row.slice(1);
-                    for (let timeIndex = 0; timeIndex < classItems.length; timeIndex++) {
-                        const item = classItems[timeIndex];
+                    row.slice(1).forEach((item, index) => {
                         if (item === subject) {
-                            totalClasses++;
-                            const timeSlot = studentSchedule.headers[timeIndex + 1];
+                            if (index === 0 || row[index] !== item) {
+                                totalClasses++;
+                            }
+                            const timeSlot = studentSchedule.headers[index + 1];
                             const record = attendanceRecords[day]?.[timeSlot];
                             if (record && record.status === 'present') {
-                                presentClasses++;
-                            }
-                            if (timeIndex + 1 < classItems.length && classItems[timeIndex + 1] === item) {
-                                timeIndex++; 
+                                if (index === 0 || row[index] !== item) {
+                                   presentClasses++;
+                                }
                             }
                         }
-                    }
+                    });
                 });
 
                 const percentage = totalClasses > 0 ? ((presentClasses / totalClasses) * 100) : 0;
                 const summaryCard = document.createElement('div');
-                const percentageColor = percentage >= 75 ? 'bg-green-100' : (percentage >= 50 ? 'bg-yellow-100' : 'bg-red-100');
-                const textColor = percentage >= 75 ? 'text-green-800' : (percentage >= 50 ? 'text-yellow-800' : 'text-red-800');
-                const progressBarColor = percentage >= 75 ? 'bg-green-500' : (percentage >= 50 ? 'bg-yellow-500' : 'bg-red-500');
+                summaryCard.className = 'col-lg-3 col-md-4 col-sm-6';
+                const bgColor = percentage >= 75 ? 'bg-success-subtle' : (percentage >= 50 ? 'bg-warning-subtle' : 'bg-danger-subtle');
 
-                summaryCard.className = `p-4 rounded-lg transition-all duration-300 ${percentageColor} ${textColor}`;
-                summaryCard.innerHTML = `<div class="font-bold text-lg">${subject}</div><div class="text-sm font-semibold mt-1">${presentClasses} / ${totalClasses} Attended</div><div class="w-full bg-gray-300 rounded-full h-2 mt-2"><div class="${progressBarColor} h-2 rounded-full" style="width: ${percentage.toFixed(0)}%"></div></div>`;
+                summaryCard.innerHTML = `
+                    <div class="card h-100 ${bgColor}">
+                        <div class="card-body">
+                            <h5 class="card-title fw-bold">${subject}</h5>
+                            <p class="card-text">${presentClasses} / ${totalClasses} Attended</p>
+                            <div class="progress" role="progressbar" aria-valuenow="${percentage}" aria-valuemin="0" aria-valuemax="100">
+                                <div class="progress-bar" style="width: ${percentage.toFixed(0)}%"></div>
+                            </div>
+                        </div>
+                    </div>`;
                 container.appendChild(summaryCard);
             });
-            if (subjects.length === 0) container.innerHTML = '<p class="col-span-full text-gray-500">No subjects found in schedule.</p>';
+            if (subjects.length === 0) container.innerHTML = '<p class="col-12 text-muted">No subjects found in schedule.</p>';
         }
         
         function renderStudentSchedule() {
             if (!studentSchedule.rows) return;
             const container = document.getElementById('student-schedule-container');
             container.innerHTML = '';
-            const grid = document.createElement('div');
-            grid.className = 'schedule-grid border border-gray-200 bg-gray-200 rounded-lg overflow-hidden';
+            const table = document.createElement('table');
+            table.className = 'table table-bordered schedule-table';
 
+            const thead = table.createTHead();
+            const headerRow = thead.insertRow();
             studentSchedule.headers.forEach(header => {
-                const cell = document.createElement('div');
-                cell.className = 'bg-gray-100 font-bold text-gray-700 p-2';
-                cell.textContent = header;
-                grid.appendChild(cell);
+                const th = document.createElement('th');
+                th.scope = 'col';
+                th.textContent = header;
+                headerRow.appendChild(th);
             });
 
-            studentSchedule.rows.forEach((row, dayIndex) => {
-                const dayCell = document.createElement('div');
-                dayCell.className = 'font-semibold bg-gray-50 flex flex-col items-center justify-center p-2';
-                dayCell.innerHTML = `<span>${row[0]}</span><button class="mt-2 text-xs bg-indigo-500 text-white rounded-full px-2 py-1 hover:bg-indigo-600">Mark Day</button>`;
-                dayCell.querySelector('button').onclick = (e) => { e.stopPropagation(); markFullDay(row[0]); };
-                grid.appendChild(dayCell);
+            const tbody = table.createTBody();
+            studentSchedule.rows.forEach(row => {
+                const tr = tbody.insertRow();
+                const dayHeaderCell = document.createElement('th');
+                dayHeaderCell.scope = 'row';
+                dayHeaderCell.className = 'day-header';
+                dayHeaderCell.innerHTML = `<span>${row[0]}</span><br><button class="btn btn-primary btn-sm btn-day mt-1">Mark Day</button>`;
+                dayHeaderCell.querySelector('button').onclick = (e) => { e.stopPropagation(); markFullDay(row[0]); };
+                tr.appendChild(dayHeaderCell);
                 
                 const classItems = row.slice(1);
                 for (let timeIndex = 0; timeIndex < classItems.length; timeIndex++) {
                     const item = classItems[timeIndex];
-                    const cell = document.createElement('div');
-
-                    if (!item) { cell.className = 'bg-white'; grid.appendChild(cell); continue; }
+                    const td = tr.insertCell();
+                    if (!item) { tr.appendChild(td); continue; }
                     
                     const day = row[0];
                     const timeSlot = studentSchedule.headers[timeIndex + 1];
                     let colSpan = 1;
-                    if (item === classItems[timeIndex + 1] && !['Tea Break', 'Lunch Break'].includes(item)) {
-                        colSpan = 2;
-                        cell.style.gridColumn = 'span 2';
+                    while (timeIndex + colSpan < classItems.length && classItems[timeIndex + colSpan] === item && !['Tea Break', 'Lunch Break'].includes(item)) {
+                        colSpan++;
                     }
+                    td.colSpan = colSpan;
 
                     const attendance = attendanceRecords[day]?.[timeSlot] || {};
-                    cell.className = `class-cell ${getStatusColor(attendance.status)}`;
+                    td.className = getStatusColor(attendance.status);
                     
                     if (item && !['Tea Break', 'Lunch Break'].includes(item)) {
-                        cell.classList.add('cursor-pointer', 'hover:bg-blue-100', 'transition', 'duration-200');
-                        cell.onclick = () => handleCellClick(item, day, timeSlot, colSpan);
+                        td.classList.add('class-cell');
+                        td.onclick = () => handleCellClick(item, day, timeSlot, colSpan);
                     } else if (['Tea Break', 'Lunch Break'].includes(item)) {
-                         cell.className = 'bg-gray-100 font-medium text-gray-500';
+                         td.classList.add('table-light', 'fw-medium');
                     }
-                    cell.textContent = item;
-                    grid.appendChild(cell);
-                    if (colSpan > 1) timeIndex++;
+                    td.textContent = item;
+                    if (colSpan > 1) timeIndex += colSpan - 1;
                 }
             });
-
-            container.appendChild(grid);
+            container.appendChild(table);
             renderAttendanceSummary();
         }
 
@@ -274,7 +287,7 @@
             document.getElementById('mark-absent').onclick = () => updateClassStatus(day, timeSlot, 'absent', colSpan);
             document.getElementById('mark-cancelled').onclick = () => updateClassStatus(day, timeSlot, 'cancelled', colSpan);
             document.getElementById('initiate-swap').onclick = () => initiateSwap(subject, day, timeSlot);
-            document.getElementById('class-action-modal').classList.remove('hidden');
+            classActionModal.show();
         }
 
         function updateClassStatus(day, timeSlot, status, colSpan = 1) {
@@ -340,16 +353,15 @@
         }
 
         function closeModal() {
-            document.getElementById('class-action-modal').classList.add('hidden');
+            classActionModal.hide();
         }
 
-        // --- DATA HANDLING (Updated for Weekly Data) ---
         async function loadDataForWeek() {
             const loadingState = document.getElementById('loading-state');
             const appContent = document.getElementById('app-content');
             
-            loadingState.classList.remove('hidden');
-            appContent.classList.add('hidden');
+            loadingState.classList.remove('d-none');
+            appContent.classList.add('d-none');
             
             const monday = getMonday(currentDate);
             currentWeekId = formatDate(monday);
@@ -366,10 +378,10 @@
                 renderStudentSchedule();
             } catch (error) {
                 console.error("Could not load data from backend:", error);
-                document.getElementById('loading-state').innerHTML = `<p class="text-red-500">Error connecting to the server. Please check the API_URL and make sure your backend is running.</p>`;
+                document.getElementById('loading-state').innerHTML = `<p class="text-danger">Error connecting to the server. Please check the API_URL and make sure your backend is running.</p>`;
             } finally {
-                loadingState.classList.add('hidden');
-                appContent.classList.remove('hidden');
+                loadingState.classList.add('d-none');
+                appContent.classList.remove('d-none');
             }
         }
         
@@ -390,9 +402,8 @@
             }
         }
 
-        // --- INITIALIZATION ---
         function init() {
-            document.getElementById('close-modal').onclick = closeModal;
+            classActionModal = new bootstrap.Modal(document.getElementById('class-action-modal'));
             document.getElementById('prev-week').onclick = () => {
                 currentDate.setDate(currentDate.getDate() - 7);
                 loadDataForWeek();
