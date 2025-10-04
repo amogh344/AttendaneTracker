@@ -49,9 +49,19 @@
 
     <div id="app" class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
         <!-- App Header -->
-        <header class="mb-8 text-center">
+        <header class="mb-6 text-center">
             <h1 class="text-4xl font-bold text-gray-900">Student Attendance Portal</h1>
-            <p id="week-title" class="text-lg text-gray-600 mt-2">Your weekly attendance dashboard.</p>
+            <!-- Week Navigation -->
+            <div class="mt-4 flex items-center justify-center space-x-4">
+                <button id="prev-week" class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                </button>
+                <h2 id="week-title" class="text-xl font-semibold text-gray-700 w-64 text-center"></h2>
+                <button id="next-week" class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+            </div>
+             <button id="today-btn" class="mt-2 text-sm text-indigo-600 hover:underline">Go to Today</button>
         </header>
 
         <!-- Loading State -->
@@ -72,7 +82,7 @@
             <!-- Main Content Area -->
             <main id="main-content">
                 <div class="bg-white p-6 rounded-lg shadow-md">
-                    <h3 class="text-xl font-semibold mb-4">This Week's Schedule & Attendance</h3>
+                    <h3 class="text-xl font-semibold mb-4">Weekly Schedule & Attendance</h3>
                     <div id="student-schedule-container" class="bg-gray-50 p-4 rounded-lg">
                         <!-- Schedule will be rendered here -->
                     </div>
@@ -104,15 +114,38 @@
     
     <script>
         // --- API Configuration ---
-        // Replace this URL with your deployed backend URL from Render
-        // const API_URL = 'https://attendance-backend.onrender.com/api/data'; 
-        // For local testing, use: 
         const API_URL = 'https://attendance-backend-5lpu.onrender.com/api/data';
 
         // --- STATE MANAGEMENT ---
         let studentSchedule = {};
         let attendanceRecords = {};
         let swapState = { active: false, source: null };
+        let currentDate = new Date(); // The date used to determine the current week
+        let currentWeekId = ''; // e.g., "2025-10-27"
+
+        // --- DATE HELPER FUNCTIONS ---
+        function getMonday(d) {
+            d = new Date(d);
+            const day = d.getDay(),
+                diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+            return new Date(d.setDate(diff));
+        }
+
+        function formatDate(date) {
+            const d = new Date(date),
+                year = d.getFullYear(),
+                month = '' + (d.getMonth() + 1),
+                day = '' + d.getDate();
+            return [year, month.padStart(2, '0'), day.padStart(2, '0')].join('-');
+        }
+
+        function getWeekDisplayString(date) {
+            const monday = getMonday(date);
+            const sunday = new Date(monday);
+            sunday.setDate(sunday.getDate() + 6);
+            const options = { month: 'short', day: 'numeric' };
+            return `${monday.toLocaleDateString('en-US', options)} - ${sunday.toLocaleDateString('en-US', { ...options, year: 'numeric' })}`;
+        }
 
         // --- CORE FUNCTIONS ---
         function getStatusColor(status) {
@@ -310,25 +343,33 @@
             document.getElementById('class-action-modal').classList.add('hidden');
         }
 
-        // --- DATA HANDLING ---
-        async function loadInitialData() {
+        // --- DATA HANDLING (Updated for Weekly Data) ---
+        async function loadDataForWeek() {
+            const loadingState = document.getElementById('loading-state');
+            const appContent = document.getElementById('app-content');
+            
+            loadingState.classList.remove('hidden');
+            appContent.classList.add('hidden');
+            
+            const monday = getMonday(currentDate);
+            currentWeekId = formatDate(monday);
+            document.getElementById('week-title').textContent = getWeekDisplayString(currentDate);
+
             try {
-                const loadingState = document.getElementById('loading-state');
-                const appContent = document.getElementById('app-content');
-                
-                const response = await fetch(API_URL);
+                const response = await fetch(`${API_URL}?weekId=${currentWeekId}`);
                 if (!response.ok) throw new Error(`Failed to fetch data: ${response.statusText}`);
                 
                 const data = await response.json();
                 studentSchedule = data.schedule;
                 attendanceRecords = data.attendance || {};
                 
-                loadingState.classList.add('hidden');
-                appContent.classList.remove('hidden');
                 renderStudentSchedule();
             } catch (error) {
                 console.error("Could not load data from backend:", error);
                 document.getElementById('loading-state').innerHTML = `<p class="text-red-500">Error connecting to the server. Please check the API_URL and make sure your backend is running.</p>`;
+            } finally {
+                loadingState.classList.add('hidden');
+                appContent.classList.remove('hidden');
             }
         }
         
@@ -336,10 +377,9 @@
             try {
                 await fetch(API_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
+                        weekId: currentWeekId,
                         schedule: studentSchedule, 
                         attendance: attendanceRecords 
                     }),
@@ -351,8 +391,25 @@
         }
 
         // --- INITIALIZATION ---
-        loadInitialData();
-        document.getElementById('close-modal').onclick = closeModal;
+        function init() {
+            document.getElementById('close-modal').onclick = closeModal;
+            document.getElementById('prev-week').onclick = () => {
+                currentDate.setDate(currentDate.getDate() - 7);
+                loadDataForWeek();
+            };
+            document.getElementById('next-week').onclick = () => {
+                currentDate.setDate(currentDate.getDate() + 7);
+                loadDataForWeek();
+            };
+            document.getElementById('today-btn').onclick = () => {
+                currentDate = new Date();
+                loadDataForWeek();
+            };
+            
+            loadDataForWeek();
+        }
+
+        init();
     </script>
 </body>
 </html>
