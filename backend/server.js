@@ -4,7 +4,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 5001; // Adjusted default port
+const PORT = process.env.PORT || 5001;
 
 // --- Middleware ---
 app.use(cors()); 
@@ -13,11 +13,9 @@ app.use(express.json());
 // --- MongoDB Connection ---
 const mongoURI = process.env.MONGODB_URI;
 
-// Add a check to ensure the connection string is present before attempting to connect
 if (!mongoURI) {
     console.error("FATAL ERROR: The MONGODB_URI environment variable is not defined.");
-    console.error("Please create a .env file in the 'backend' directory and add your MongoDB connection string.");
-    process.exit(1); // Exit the application with a failure code
+    process.exit(1);
 }
 
 mongoose.connect(mongoURI)
@@ -25,7 +23,6 @@ mongoose.connect(mongoURI)
   .catch(err => console.error('MongoDB connection error:', err));
   
 // --- Base Schedule Template ---
-// This acts as the default template for any new week.
 const initialSchedule = {
     headers: ["Day", "8:45-9:40", "9:40-10:35", "10:35-10:50", "10:50-11:45", "11:45-12:40", "12:40-1:40", "1:40-2:35", "2:35-3:30", "3:30-4:25", "4:25-5:20"],
     rows: [
@@ -39,10 +36,10 @@ const initialSchedule = {
 
 // --- Data Schema for Weekly Data ---
 const WeeklyDataSchema = new mongoose.Schema({
-    // weekId will be the date of the Monday of that week, e.g., "2025-10-27"
     weekId: { type: String, required: true, unique: true }, 
     schedule: { type: Object, required: true },
-    attendance: { type: Object, default: {} }
+    attendance: { type: Object, default: {} },
+    extraClasses: { type: Object, default: {} } // New field for extra classes
 });
 
 const WeeklyData = mongoose.model('WeeklyData', WeeklyDataSchema);
@@ -58,13 +55,12 @@ app.get('/api/data', async (req, res) => {
     try {
         let data = await WeeklyData.findOne({ weekId });
         if (!data) {
-            // If no data exists for this week, return the default schedule
-            // with empty attendance. This allows the user to see the schedule
-            // for a future week without creating a DB entry yet.
+            // If no data exists, return the default template
             res.json({
                 weekId: weekId,
                 schedule: initialSchedule,
-                attendance: {}
+                attendance: {},
+                extraClasses: {} // Return empty object for extra classes
             });
         } else {
             res.json(data);
@@ -77,15 +73,14 @@ app.get('/api/data', async (req, res) => {
 // POST: Update or create data for a specific week
 app.post('/api/data', async (req, res) => {
     try {
-        const { weekId, schedule, attendance } = req.body;
+        const { weekId, schedule, attendance, extraClasses } = req.body;
         if (!weekId) {
             return res.status(400).json({ message: 'weekId is required in the request body.' });
         }
 
-        // Find the document for the week and update it, or create it if it doesn't exist (upsert: true)
         const updatedData = await WeeklyData.findOneAndUpdate(
             { weekId: weekId },
-            { schedule, attendance },
+            { schedule, attendance, extraClasses }, // Include extraClasses in the update
             { new: true, upsert: true, setDefaultsOnInsert: true }
         );
         res.json(updatedData);
