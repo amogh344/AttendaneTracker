@@ -37,6 +37,11 @@
         .btn-day {
             font-size: 0.75rem;
         }
+        .extra-class-btn {
+            width: 30px;
+            height: 30px;
+            line-height: 1;
+        }
     </style>
 </head>
 <body>
@@ -48,7 +53,7 @@
             <!-- Week Navigation -->
             <div class="mt-4 d-flex align-items-center justify-content-center gap-3">
                 <button id="prev-week" class="btn btn-light rounded-pill p-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-chevron-left" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>
+                    <svg xmlns="http://www.w.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-chevron-left" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>
                 </button>
                 <h2 id="week-title" class="h4 fw-semibold m-0" style="width: 280px;"></h2>
                 <button id="next-week" class="btn btn-light rounded-pill p-2">
@@ -123,24 +128,21 @@
         // --- STATE MANAGEMENT ---
         let studentSchedule = {};
         let attendanceRecords = {};
+        let extraClasses = {}; // For tracking extra classes
         let swapState = { active: false, source: null };
         let currentDate = new Date();
         let currentWeekId = '';
-        let classActionModal; // To hold Bootstrap modal instance
+        let classActionModal;
 
         // --- DATE HELPER FUNCTIONS ---
         function getMonday(d) {
             d = new Date(d);
-            const day = d.getDay(),
-                diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            const day = d.getDay(), diff = d.getDate() - day + (day === 0 ? -6 : 1);
             return new Date(d.setDate(diff));
         }
 
         function formatDate(date) {
-            const d = new Date(date),
-                year = d.getFullYear(),
-                month = '' + (d.getMonth() + 1),
-                day = '' + d.getDate();
+            const d = new Date(date), year = d.getFullYear(), month = '' + (d.getMonth() + 1), day = '' + d.getDate();
             return [year, month.padStart(2, '0'), day.padStart(2, '0')].join('-');
         }
 
@@ -169,27 +171,36 @@
 
             const subjects = [...new Set(studentSchedule.rows.flatMap(row => row.slice(1)).filter(item => item && !['Tea Break', 'Lunch Break'].includes(item)))];
             subjects.forEach(subject => {
-                let totalClasses = 0;
+                let totalClassesScheduled = 0;
                 let presentClasses = 0;
+                
+                // Calculate scheduled and attended classes from the timetable
                 studentSchedule.rows.forEach(row => {
                     const day = row[0];
-                    row.slice(1).forEach((item, index) => {
+                    const classItems = row.slice(1);
+                    for (let timeIndex = 0; timeIndex < classItems.length; timeIndex++) {
+                        const item = classItems[timeIndex];
                         if (item === subject) {
-                            if (index === 0 || row[index] !== item) {
-                                totalClasses++;
-                            }
-                            const timeSlot = studentSchedule.headers[index + 1];
+                            totalClassesScheduled++;
+                            const timeSlot = studentSchedule.headers[timeIndex + 1];
                             const record = attendanceRecords[day]?.[timeSlot];
                             if (record && record.status === 'present') {
-                                if (index === 0 || row[index] !== item) {
-                                   presentClasses++;
-                                }
+                                presentClasses++;
                             }
+                            // Skip the next cells if it's a multi-hour class to count it as one scheduled class
+                            let colSpan = 1;
+                            while (timeIndex + colSpan < classItems.length && classItems[timeIndex + colSpan] === item) {
+                                colSpan++;
+                            }
+                            timeIndex += colSpan - 1;
                         }
-                    });
+                    }
                 });
-
-                const percentage = totalClasses > 0 ? ((presentClasses / totalClasses) * 100) : 0;
+                
+                const extraCount = extraClasses[subject] || 0;
+                const totalAttended = presentClasses + extraCount;
+                const percentage = totalClassesScheduled > 0 ? ((totalAttended / totalClassesScheduled) * 100) : 0;
+                
                 const summaryCard = document.createElement('div');
                 summaryCard.className = 'col-lg-3 col-md-4 col-sm-6';
                 const bgColor = percentage >= 75 ? 'bg-success-subtle' : (percentage >= 50 ? 'bg-warning-subtle' : 'bg-danger-subtle');
@@ -197,10 +208,18 @@
                 summaryCard.innerHTML = `
                     <div class="card h-100 ${bgColor}">
                         <div class="card-body">
-                            <h5 class="card-title fw-bold">${subject}</h5>
-                            <p class="card-text">${presentClasses} / ${totalClasses} Attended</p>
+                            <div class="d-flex justify-content-between align-items-start">
+                                <h5 class="card-title fw-bold mb-0">${subject}</h5>
+                                <div class="d-flex align-items-center gap-1">
+                                    <button class="btn btn-sm btn-outline-secondary rounded-pill extra-class-btn" onclick="removeExtraClass('${subject}')">-</button>
+                                    <button class="btn btn-sm btn-outline-secondary rounded-pill extra-class-btn" onclick="addExtraClass('${subject}')">+</button>
+                                </div>
+                            </div>
+                            <p class="card-text mt-2 mb-1">
+                                (${presentClasses} + ${extraCount} extra) / ${totalClassesScheduled} Attended
+                            </p>
                             <div class="progress" role="progressbar" aria-valuenow="${percentage}" aria-valuemin="0" aria-valuemax="100">
-                                <div class="progress-bar" style="width: ${percentage.toFixed(0)}%"></div>
+                                <div class="progress-bar" style="width: ${Math.min(percentage, 100).toFixed(0)}%"></div>
                             </div>
                         </div>
                     </div>`;
@@ -208,7 +227,7 @@
             });
             if (subjects.length === 0) container.innerHTML = '<p class="col-12 text-muted">No subjects found in schedule.</p>';
         }
-        
+
         function renderStudentSchedule() {
             if (!studentSchedule.rows) return;
             const container = document.getElementById('student-schedule-container');
@@ -239,7 +258,7 @@
                 for (let timeIndex = 0; timeIndex < classItems.length; timeIndex++) {
                     const item = classItems[timeIndex];
                     const td = tr.insertCell();
-                    if (!item) { tr.appendChild(td); continue; }
+                    if (!item) { continue; }
                     
                     const day = row[0];
                     const timeSlot = studentSchedule.headers[timeIndex + 1];
@@ -259,7 +278,9 @@
                          td.classList.add('table-light', 'fw-medium');
                     }
                     td.textContent = item;
-                    if (colSpan > 1) timeIndex += colSpan - 1;
+                    if (colSpan > 1) {
+                        timeIndex += colSpan - 1;
+                    }
                 }
             });
             container.appendChild(table);
@@ -300,6 +321,23 @@
             closeModal();
             renderStudentSchedule();
             saveData();
+        }
+        
+        function addExtraClass(subject) {
+            if (!extraClasses[subject]) {
+                extraClasses[subject] = 0;
+            }
+            extraClasses[subject]++;
+            renderAttendanceSummary();
+            saveData();
+        }
+
+        function removeExtraClass(subject) {
+            if (extraClasses[subject] && extraClasses[subject] > 0) {
+                extraClasses[subject]--;
+                renderAttendanceSummary();
+                saveData();
+            }
         }
 
         function markFullDay(day) {
@@ -374,6 +412,7 @@
                 const data = await response.json();
                 studentSchedule = data.schedule;
                 attendanceRecords = data.attendance || {};
+                extraClasses = data.extraClasses || {};
                 
                 renderStudentSchedule();
             } catch (error) {
@@ -393,7 +432,8 @@
                     body: JSON.stringify({ 
                         weekId: currentWeekId,
                         schedule: studentSchedule, 
-                        attendance: attendanceRecords 
+                        attendance: attendanceRecords,
+                        extraClasses: extraClasses
                     }),
                 });
             } catch (error) {
