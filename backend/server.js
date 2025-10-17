@@ -93,44 +93,53 @@ app.post('/api/data', async (req, res) => {
 // GET overall summary data
 app.get('/api/summary', async (req, res) => {
     try {
-        // Helper function to get the Monday of the current week
         const getMonday = d => {
             d = new Date(d);
+            d.setHours(0, 0, 0, 0);
             const day = d.getDay(),
                 diff = d.getDate() - day + (day === 0 ? -6 : 1);
             return new Date(d.setDate(diff));
         };
         
         const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const mondayOfCurrentWeek = getMonday(today);
 
         const allRecords = await AppData.find({});
         
         let totalScheduled = 0;
         let totalAttended = 0;
+        
+        const dayMap = { "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6, "Sunday": 7 };
+        const todayDayIndex = today.getDay() === 0 ? 7 : today.getDay();
 
         for (const record of allRecords) {
             const recordDate = new Date(record.weekId);
-             // Only process weeks up to and including the current week
             if (recordDate > mondayOfCurrentWeek) {
-                continue;
+                continue; // Skip future weeks
             }
 
             const { schedule, attendance, extraClasses } = record;
             if (!schedule || !schedule.rows) continue;
 
-            // Calculate scheduled and attended classes from the timetable
+            const isCurrentWeek = recordDate.getTime() === mondayOfCurrentWeek.getTime();
+
             schedule.rows.forEach(row => {
-                const day = row[0];
-                const classItems = row.slice(1);
+                const dayName = row[0];
+                const dayIndex = dayMap[dayName];
                 
+                // If it's the current week, only count days up to today
+                if (isCurrentWeek && dayIndex > todayDayIndex) {
+                    return; 
+                }
+
+                const classItems = row.slice(1);
                 for (let timeIndex = 0; timeIndex < classItems.length; timeIndex++) {
                     const item = classItems[timeIndex];
                     if (item && !['Tea Break', 'Lunch Break'].includes(item)) {
                         const timeSlot = schedule.headers[timeIndex + 1];
-                        const attendanceStatus = attendance?.[day]?.[timeSlot]?.status;
+                        const attendanceStatus = attendance?.[dayName]?.[timeSlot]?.status;
                         
-                        // IMPORTANT: Cancelled classes are not counted as scheduled
                         if (attendanceStatus !== 'cancelled') {
                             totalScheduled++;
                             if (attendanceStatus === 'present') {
@@ -138,7 +147,6 @@ app.get('/api/summary', async (req, res) => {
                             }
                         }
 
-                        // Skip subsequent cells for multi-hour classes
                         let colSpan = 1;
                         while (timeIndex + colSpan < classItems.length && classItems[timeIndex + colSpan] === item) {
                             colSpan++;
@@ -148,7 +156,6 @@ app.get('/api/summary', async (req, res) => {
                 }
             });
 
-            // Add extra classes to the attended count
             if (extraClasses) {
                 for (const subject in extraClasses) {
                     totalAttended += extraClasses[subject];
