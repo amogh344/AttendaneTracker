@@ -15,32 +15,29 @@
         .schedule-table th, .schedule-table td {
             vertical-align: middle;
             text-align: center;
-            min-height: 80px;
             font-size: 0.9rem;
+            padding: 0.75rem 0.25rem;
         }
         .class-cell {
             cursor: pointer;
             transition: background-color 0.2s ease-in-out;
         }
-        .class-cell:hover {
+        .class-cell:not(.swapping-target):hover {
             background-color: #e9ecef;
         }
-        .swapping {
+        .swapping-active .class-cell {
             cursor: copy;
         }
-        .swapping .class-cell:hover {
+        .swapping-target {
             outline: 2px dashed #0d6efd;
+            background-color: #cfe2ff !important;
         }
-        .day-header {
-            font-weight: 600;
-        }
-        .btn-day {
-            font-size: 0.75rem;
-        }
-        .extra-class-btn {
-            width: 30px;
-            height: 30px;
-            line-height: 1;
+        .day-header { font-weight: 600; }
+        .btn-day { font-size: 0.75rem; }
+        .extra-class-btn { width: 30px; height: 30px; line-height: 1; }
+        #overall-summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
         }
     </style>
 </head>
@@ -48,60 +45,58 @@
 
     <div id="app" class="container my-5">
         <!-- App Header -->
-        <header class="mb-5 text-center">
+        <header class="mb-4 text-center">
             <h1 class="display-4 fw-bold">Student Attendance Portal</h1>
-            <!-- Week Navigation -->
-            <div class="mt-4 d-flex align-items-center justify-content-center gap-3">
-                <button id="prev-week" class="btn btn-light rounded-pill p-2">
-                    <svg xmlns="http://www.w.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-chevron-left" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>
-                </button>
-                <h2 id="week-title" class="h4 fw-semibold m-0" style="width: 280px;"></h2>
-                <button id="next-week" class="btn btn-light rounded-pill p-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-chevron-right" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>
-                </button>
-            </div>
-             <button id="today-btn" class="btn btn-link mt-2">Go to Today</button>
         </header>
 
         <!-- Loading State -->
         <div id="loading-state" class="text-center py-5">
-            <div class="spinner-border" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2">Connecting to server...</p>
+            <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+            <p class="mt-2">Loading your attendance data...</p>
         </div>
 
         <div id="app-content" class="d-none">
-            <!-- Attendance Summary -->
-            <div id="attendance-summary" class="card shadow-sm mb-4">
+            
+            <!-- Overall Summary -->
+            <div id="overall-summary-card" class="card shadow-lg mb-5 text-center p-4 rounded-4">
+                 <h2 class="h5 mb-2 text-white-75">Overall Attendance To-Date</h2>
+                 <div id="overall-summary-content">
+                     <!-- Populated by JS -->
+                 </div>
+            </div>
+
+            <!-- Weekly View Header -->
+            <div class="d-flex align-items-center justify-content-center gap-3 mb-2">
+                <button id="prev-week" class="btn btn-light rounded-pill p-2"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-chevron-left" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg></button>
+                <h2 id="week-title" class="h4 fw-semibold m-0" style="width: 280px;"></h2>
+                <button id="next-week" class="btn btn-light rounded-pill p-2"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-chevron-right" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg></button>
+            </div>
+            <div class="text-center mb-4"><button id="today-btn" class="btn btn-link">Go to Today</button></div>
+
+            <!-- Weekly Subject Summary -->
+            <div class="card shadow-sm mb-4">
                 <div class="card-body">
-                    <h3 class="card-title mb-4">Attendance Summary</h3>
-                    <div id="summary-grid" class="row g-3">
-                        <!-- Summary cards will be rendered here -->
-                    </div>
+                    <h3 class="card-title mb-4">This Week's Summary</h3>
+                    <div id="summary-grid" class="row g-3"></div>
                 </div>
             </div>
 
-            <!-- Main Content Area -->
+            <!-- Weekly Schedule Table -->
             <main id="main-content">
                 <div class="card shadow-sm">
                     <div class="card-body">
-                        <h3 class="card-title mb-4">Weekly Schedule & Attendance</h3>
-                        <div id="student-schedule-container" class="table-responsive">
-                            <!-- Schedule will be rendered here -->
-                        </div>
+                        <h3 class="card-title mb-4">Weekly Schedule</h3>
+                        <div id="student-schedule-container" class="table-responsive"></div>
                     </div>
                 </div>
             </main>
         </div>
 
         <!-- Class Action Modal -->
-        <div class="modal fade" id="class-action-modal" tabindex="-1" aria-labelledby="modal-title" aria-hidden="true">
+        <div class="modal fade" id="class-action-modal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
-                    <div class="modal-header text-center">
-                        <h5 class="modal-title w-100 h3" id="modal-title">Class Action</h5>
-                    </div>
+                    <div class="modal-header text-center"><h5 class="modal-title w-100 h3" id="modal-title"></h5></div>
                     <div class="modal-body">
                         <p class="text-center text-muted" id="modal-subtitle"></p>
                         <div class="d-grid gap-3 mt-4">
@@ -111,9 +106,7 @@
                             <button id="initiate-swap" class="btn btn-primary btn-lg">Swap Class</button>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-light w-100" data-bs-dismiss="modal">Close</button>
-                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-light w-100" data-bs-dismiss="modal">Close</button></div>
                 </div>
             </div>
         </div>
@@ -123,12 +116,12 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
     <script>
         // --- API Configuration ---
-        const API_URL = 'https://attendance-backend-5lpu.onrender.com/api/data';
+        const API_BASE_URL = 'https://attendance-backend-5lpu.onrender.com/api';
 
         // --- STATE MANAGEMENT ---
         let studentSchedule = {};
         let attendanceRecords = {};
-        let extraClasses = {}; // For tracking extra classes
+        let extraClasses = {}; 
         let swapState = { active: false, source: null };
         let currentDate = new Date();
         let currentWeekId = '';
@@ -154,7 +147,7 @@
             return `${monday.toLocaleDateString('en-US', options)} - ${sunday.toLocaleDateString('en-US', { ...options, year: 'numeric' })}`;
         }
 
-        // --- CORE FUNCTIONS ---
+        // --- UI RENDERING FUNCTIONS ---
         function getStatusColor(status) {
             switch (status) {
                 case 'present': return 'table-success';
@@ -164,30 +157,44 @@
             }
         }
 
-        function renderAttendanceSummary() {
+        function renderOverallSummary(summaryData) {
+            const container = document.getElementById('overall-summary-content');
+            if (!summaryData) {
+                container.innerHTML = `<p class="text-white-75">Could not load summary.</p>`;
+                return;
+            }
+            const { totalScheduled, totalAttended } = summaryData;
+            const percentage = totalScheduled > 0 ? ((totalAttended / totalScheduled) * 100).toFixed(1) : 0;
+            container.innerHTML = `
+                <p class="display-4 fw-bold m-0">${totalAttended} / ${totalScheduled}</p>
+                <p class="h4 fw-light text-white-75 mt-2">${percentage}% Attended</p>
+            `;
+        }
+
+        function renderWeeklySummary() {
             const container = document.getElementById('summary-grid');
             if (!container || !studentSchedule.rows) return;
             container.innerHTML = '';
 
-            const subjects = [...new Set(studentSchedule.rows.flatMap(row => row.slice(1)).filter(item => item && !['Tea Break', 'Lunch Break'].includes(item)))];
+            const subjects = [...new Set(studentSchedule.rows.flatMap(row => row.slice(1)).filter(Boolean).filter(item => !['Tea Break', 'Lunch Break'].includes(item)))];
+            
             subjects.forEach(subject => {
-                let totalClassesScheduled = 0;
-                let presentClasses = 0;
+                let scheduled = 0, attended = 0;
                 
-                // Calculate scheduled and attended classes from the timetable
                 studentSchedule.rows.forEach(row => {
                     const day = row[0];
                     const classItems = row.slice(1);
                     for (let timeIndex = 0; timeIndex < classItems.length; timeIndex++) {
                         const item = classItems[timeIndex];
                         if (item === subject) {
-                            totalClassesScheduled++;
                             const timeSlot = studentSchedule.headers[timeIndex + 1];
-                            const record = attendanceRecords[day]?.[timeSlot];
-                            if (record && record.status === 'present') {
-                                presentClasses++;
+                            const status = attendanceRecords[day]?.[timeSlot]?.status;
+                            if (status !== 'cancelled') {
+                                scheduled++;
                             }
-                            // Skip the next cells if it's a multi-hour class to count it as one scheduled class
+                            if (status === 'present') {
+                                attended++;
+                            }
                             let colSpan = 1;
                             while (timeIndex + colSpan < classItems.length && classItems[timeIndex + colSpan] === item) {
                                 colSpan++;
@@ -198,252 +205,237 @@
                 });
                 
                 const extraCount = extraClasses[subject] || 0;
-                const totalAttended = presentClasses + extraCount;
-                const percentage = totalClassesScheduled > 0 ? ((totalAttended / totalClassesScheduled) * 100) : 0;
+                const totalAttended = attended + extraCount;
+                const percentage = scheduled > 0 ? ((totalAttended / scheduled) * 100) : 0;
                 
-                const summaryCard = document.createElement('div');
-                summaryCard.className = 'col-lg-3 col-md-4 col-sm-6';
+                const card = document.createElement('div');
+                card.className = 'col-lg-3 col-md-4 col-sm-6';
                 const bgColor = percentage >= 75 ? 'bg-success-subtle' : (percentage >= 50 ? 'bg-warning-subtle' : 'bg-danger-subtle');
 
-                summaryCard.innerHTML = `
+                card.innerHTML = `
                     <div class="card h-100 ${bgColor}">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start">
                                 <h5 class="card-title fw-bold mb-0">${subject}</h5>
                                 <div class="d-flex align-items-center gap-1">
-                                    <button class="btn btn-sm btn-outline-secondary rounded-pill extra-class-btn" onclick="removeExtraClass('${subject}')">-</button>
-                                    <button class="btn btn-sm btn-outline-secondary rounded-pill extra-class-btn" onclick="addExtraClass('${subject}')">+</button>
+                                    <button class="btn btn-sm btn-outline-secondary rounded-pill extra-class-btn" onclick="updateExtraClass('${subject}', -1)">-</button>
+                                    <button class="btn btn-sm btn-outline-secondary rounded-pill extra-class-btn" onclick="updateExtraClass('${subject}', 1)">+</button>
                                 </div>
                             </div>
                             <p class="card-text mt-2 mb-1">
-                                (${presentClasses} + ${extraCount} extra) / ${totalClassesScheduled} Attended
+                                (${attended} + ${extraCount} extra) / ${scheduled} Attended
                             </p>
-                            <div class="progress" role="progressbar" aria-valuenow="${percentage}" aria-valuemin="0" aria-valuemax="100">
-                                <div class="progress-bar" style="width: ${Math.min(percentage, 100).toFixed(0)}%"></div>
-                            </div>
+                            <div class="progress" role="progressbar"><div class="progress-bar" style="width: ${Math.min(percentage, 100).toFixed(0)}%"></div></div>
                         </div>
                     </div>`;
-                container.appendChild(summaryCard);
+                container.appendChild(card);
             });
-            if (subjects.length === 0) container.innerHTML = '<p class="col-12 text-muted">No subjects found in schedule.</p>';
         }
-
+        
         function renderStudentSchedule() {
             if (!studentSchedule.rows) return;
             const container = document.getElementById('student-schedule-container');
             container.innerHTML = '';
             const table = document.createElement('table');
             table.className = 'table table-bordered schedule-table';
+            document.body.classList.toggle('swapping-active', swapState.active);
 
             const thead = table.createTHead();
             const headerRow = thead.insertRow();
-            studentSchedule.headers.forEach(header => {
-                const th = document.createElement('th');
-                th.scope = 'col';
-                th.textContent = header;
-                headerRow.appendChild(th);
-            });
+            studentSchedule.headers.forEach(header => headerRow.innerHTML += `<th scope="col">${header}</th>`);
 
             const tbody = table.createTBody();
             studentSchedule.rows.forEach(row => {
                 const tr = tbody.insertRow();
-                const dayHeaderCell = document.createElement('th');
-                dayHeaderCell.scope = 'row';
-                dayHeaderCell.className = 'day-header';
-                dayHeaderCell.innerHTML = `<span>${row[0]}</span><br><button class="btn btn-primary btn-sm btn-day mt-1">Mark Day</button>`;
-                dayHeaderCell.querySelector('button').onclick = (e) => { e.stopPropagation(); markFullDay(row[0]); };
-                tr.appendChild(dayHeaderCell);
+                tr.innerHTML += `<th scope="row" class="day-header"><span>${row[0]}</span><br><button class="btn btn-primary btn-sm btn-day mt-1">Mark Day</button></th>`;
+                tr.querySelector('button').onclick = e => { e.stopPropagation(); markFullDay(row[0]); };
                 
-                const classItems = row.slice(1);
-                for (let timeIndex = 0; timeIndex < classItems.length; timeIndex++) {
-                    const item = classItems[timeIndex];
-                    const td = tr.insertCell();
-                    if (!item) { continue; }
-                    
+                for (let i = 1; i < row.length; i++) {
+                    const item = row[i];
                     const day = row[0];
-                    const timeSlot = studentSchedule.headers[timeIndex + 1];
-                    let colSpan = 1;
-                    while (timeIndex + colSpan < classItems.length && classItems[timeIndex + colSpan] === item && !['Tea Break', 'Lunch Break'].includes(item)) {
-                        colSpan++;
-                    }
-                    td.colSpan = colSpan;
-
-                    const attendance = attendanceRecords[day]?.[timeSlot] || {};
-                    td.className = getStatusColor(attendance.status);
+                    const time = studentSchedule.headers[i];
                     
-                    if (item && !['Tea Break', 'Lunch Break'].includes(item)) {
-                        td.classList.add('class-cell');
-                        td.onclick = () => handleCellClick(item, day, timeSlot, colSpan);
-                    } else if (['Tea Break', 'Lunch Break'].includes(item)) {
-                         td.classList.add('table-light', 'fw-medium');
-                    }
+                    if (i > 1 && item === row[i-1] && item && !['Tea Break', 'Lunch Break'].includes(item)) continue;
+
+                    let colSpan = 1;
+                    while (i + colSpan < row.length && row[i + colSpan] === item) colSpan++;
+                    
+                    const td = tr.insertCell();
+                    td.colSpan = colSpan;
                     td.textContent = item;
-                    if (colSpan > 1) {
-                        timeIndex += colSpan - 1;
+
+                    if (!item) continue;
+                    
+                    const status = attendanceRecords[day]?.[time]?.status;
+                    td.className = getStatusColor(status);
+
+                    if (['Tea Break', 'Lunch Break'].includes(item)) {
+                        td.classList.add('table-light', 'fw-medium');
+                    } else {
+                        td.classList.add('class-cell');
+                        td.onclick = () => handleCellClick(item, day, time, colSpan);
+                        if (swapState.active && swapState.source.day === day) {
+                             td.classList.add('swapping-target');
+                        }
                     }
                 }
             });
             container.appendChild(table);
-            renderAttendanceSummary();
+            renderWeeklySummary();
         }
 
-        function handleCellClick(subject, day, timeSlot, colSpan = 1) {
+        // --- EVENT HANDLING & LOGIC ---
+        function handleCellClick(subject, day, time, colSpan) {
             if (swapState.active) {
-                if (swapState.source.day === day && swapState.source.timeSlot === timeSlot) {
-                    document.body.classList.remove('swapping');
+                if (swapState.source.day !== day) return; // Enforce same-day swap
+                if (swapState.source.time === time) { // Cancel swap
                     swapState = { active: false, source: null };
-                    alert('Swap cancelled.');
-                } else {
-                    completeSwap(day, timeSlot);
+                } else { // Complete swap
+                    completeSwap(day, time);
                 }
             } else {
-                openClassActionModal(subject, day, timeSlot, colSpan);
+                openClassActionModal(subject, day, time, colSpan);
             }
+            renderStudentSchedule();
         }
         
-        function openClassActionModal(subject, day, timeSlot, colSpan = 1) {
+        function openClassActionModal(subject, day, time, colSpan) {
             document.getElementById('modal-title').textContent = subject;
-            document.getElementById('modal-subtitle').textContent = `${day} at ${timeSlot}`;
-            document.getElementById('mark-present').onclick = () => updateClassStatus(day, timeSlot, 'present', colSpan);
-            document.getElementById('mark-absent').onclick = () => updateClassStatus(day, timeSlot, 'absent', colSpan);
-            document.getElementById('mark-cancelled').onclick = () => updateClassStatus(day, timeSlot, 'cancelled', colSpan);
-            document.getElementById('initiate-swap').onclick = () => initiateSwap(subject, day, timeSlot);
+            document.getElementById('modal-subtitle').textContent = `${day} at ${time}`;
+            document.getElementById('mark-present').onclick = () => updateClassStatus(day, time, 'present', colSpan);
+            document.getElementById('mark-absent').onclick = () => updateClassStatus(day, time, 'absent', colSpan);
+            document.getElementById('mark-cancelled').onclick = () => updateClassStatus(day, time, 'cancelled', colSpan);
+            document.getElementById('initiate-swap').onclick = () => {
+                swapState = { active: true, source: { subject, day, time } };
+                classActionModal.hide();
+                renderStudentSchedule();
+            };
             classActionModal.show();
         }
 
-        function updateClassStatus(day, timeSlot, status, colSpan = 1) {
+        function updateClassStatus(day, time, status, colSpan) {
             if (!attendanceRecords[day]) attendanceRecords[day] = {};
-            const startTimeIndex = studentSchedule.headers.indexOf(timeSlot);
+            const startIndex = studentSchedule.headers.indexOf(time);
             for (let i = 0; i < colSpan; i++) {
-                const currentTimeSlot = studentSchedule.headers[startTimeIndex + i];
-                if (currentTimeSlot) attendanceRecords[day][currentTimeSlot] = { status };
+                const currentTime = studentSchedule.headers[startIndex + i];
+                if(currentTime) attendanceRecords[day][currentTime] = { status };
             }
-            closeModal();
+            classActionModal.hide();
             renderStudentSchedule();
             saveData();
         }
-        
-        function addExtraClass(subject) {
-            if (!extraClasses[subject]) {
-                extraClasses[subject] = 0;
-            }
-            extraClasses[subject]++;
-            renderAttendanceSummary();
-            saveData();
-        }
 
-        function removeExtraClass(subject) {
-            if (extraClasses[subject] && extraClasses[subject] > 0) {
-                extraClasses[subject]--;
-                renderAttendanceSummary();
-                saveData();
-            }
+        function updateExtraClass(subject, amount) {
+            if (!extraClasses[subject]) extraClasses[subject] = 0;
+            extraClasses[subject] = Math.max(0, extraClasses[subject] + amount);
+            renderWeeklySummary();
+            saveData();
         }
 
         function markFullDay(day) {
             if (!attendanceRecords[day]) attendanceRecords[day] = {};
-            const dayRow = studentSchedule.rows.find(r => r[0] === day);
-            dayRow.slice(1).forEach((item, index) => {
+            studentSchedule.rows.find(r => r[0] === day).slice(1).forEach((item, i) => {
                 if (item && !['Tea Break', 'Lunch Break'].includes(item)) {
-                    const timeSlot = studentSchedule.headers[index + 1];
-                    attendanceRecords[day][timeSlot] = { status: 'present' };
+                    attendanceRecords[day][studentSchedule.headers[i + 1]] = { status: 'present' };
                 }
             });
             renderStudentSchedule();
             saveData();
         }
+        
+        function completeSwap(toDay, toTime) {
+            const { source } = swapState;
+            const dayIndex = studentSchedule.rows.findIndex(r => r[0] === source.day);
+            const fromIndex = studentSchedule.headers.indexOf(source.time);
+            const toIndex = studentSchedule.headers.indexOf(toTime);
 
-        function initiateSwap(subject, day, timeSlot) {
-            swapState = { active: true, source: { subject, day, timeSlot } };
-            document.body.classList.add('swapping');
-            closeModal();
-            alert('Swap initiated. Now click on the class you want to swap with.');
+            // Swap subjects in schedule
+            const fromSubject = studentSchedule.rows[dayIndex][fromIndex];
+            const toSubject = studentSchedule.rows[dayIndex][toIndex];
+            studentSchedule.rows[dayIndex][fromIndex] = toSubject;
+            studentSchedule.rows[dayIndex][toIndex] = fromSubject;
+            
+            // Swap attendance records
+            const fromAttendance = attendanceRecords[source.day]?.[source.time];
+            const toAttendance = attendanceRecords[toDay]?.[toTime];
+            if (!attendanceRecords[source.day]) attendanceRecords[source.day] = {};
+            attendanceRecords[source.day][source.time] = toAttendance;
+            attendanceRecords[source.day][toTime] = fromAttendance;
+
+            swapState = { active: false, source: null }; // Reset state
+            saveData(); // Save changes
+        }
+
+        // --- DATA FETCHING ---
+        async function loadInitialData() {
+            try {
+                const [summaryRes, weekRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/summary`),
+                    fetch(`${API_BASE_URL}/data?weekId=${formatDate(getMonday(currentDate))}`)
+                ]);
+
+                if (!summaryRes.ok || !weekRes.ok) throw new Error('Failed to fetch initial data');
+
+                const summaryData = await summaryRes.json();
+                const weekData = await weekRes.json();
+                
+                renderOverallSummary(summaryData);
+
+                studentSchedule = weekData.schedule;
+                attendanceRecords = weekData.attendance || {};
+                extraClasses = weekData.extraClasses || {};
+                
+                document.getElementById('week-title').textContent = getWeekDisplayString(currentDate);
+                renderStudentSchedule();
+
+            } catch (error) {
+                console.error("Could not load data:", error);
+                document.getElementById('loading-state').innerHTML = `<p class="text-danger">Error connecting to the server. Please ensure the backend is running.</p>`;
+            } finally {
+                document.getElementById('loading-state').classList.add('d-none');
+                document.getElementById('app-content').classList.remove('d-none');
+            }
         }
         
-        function completeSwap(toDay, toTimeSlot) {
-            const from = swapState.source;
-            const fromDayIndex = studentSchedule.rows.findIndex(r => r[0] === from.day);
-            const fromTimeIndex = studentSchedule.headers.indexOf(from.timeSlot);
-            const toDayIndex = studentSchedule.rows.findIndex(r => r[0] === toDay);
-            const toTimeIndex = studentSchedule.headers.indexOf(toTimeSlot);
-
-            if (fromDayIndex === -1 || fromTimeIndex === -1 || toDayIndex === -1 || toTimeIndex === -1) {
-                console.error("Swap failed: Invalid indices"); return;
-            }
-
-            const fromSubject = studentSchedule.rows[fromDayIndex][fromTimeIndex];
-            const toSubject = studentSchedule.rows[toDayIndex][toTimeIndex];
-            studentSchedule.rows[fromDayIndex][fromTimeIndex] = toSubject;
-            studentSchedule.rows[toDayIndex][toTimeIndex] = fromSubject;
-            
-            if (!attendanceRecords[from.day]) attendanceRecords[from.day] = {};
-            if (!attendanceRecords[toDay]) attendanceRecords[toDay] = {};
-            const fromAttendance = attendanceRecords[from.day][from.timeSlot];
-            const toAttendance = attendanceRecords[toDay][toTimeSlot];
-            attendanceRecords[from.day][from.timeSlot] = toAttendance;
-            attendanceRecords[toDay][toTimeSlot] = fromAttendance;
-
-            swapState = { active: false, source: null };
-            document.body.classList.remove('swapping');
-            alert(`Swapped "${fromSubject}" with "${toSubject}".`);
-            renderStudentSchedule();
-            saveData();
-        }
-
-        function closeModal() {
-            classActionModal.hide();
-        }
-
         async function loadDataForWeek() {
-            const loadingState = document.getElementById('loading-state');
-            const appContent = document.getElementById('app-content');
-            
-            loadingState.classList.remove('d-none');
-            appContent.classList.add('d-none');
-            
-            const monday = getMonday(currentDate);
-            currentWeekId = formatDate(monday);
+            currentWeekId = formatDate(getMonday(currentDate));
             document.getElementById('week-title').textContent = getWeekDisplayString(currentDate);
 
             try {
-                const response = await fetch(`${API_URL}?weekId=${currentWeekId}`);
-                if (!response.ok) throw new Error(`Failed to fetch data: ${response.statusText}`);
+                const response = await fetch(`${API_BASE_URL}/data?weekId=${currentWeekId}`);
+                if (!response.ok) throw new Error(`Failed to fetch week data`);
                 
                 const data = await response.json();
                 studentSchedule = data.schedule;
                 attendanceRecords = data.attendance || {};
                 extraClasses = data.extraClasses || {};
-                
                 renderStudentSchedule();
             } catch (error) {
-                console.error("Could not load data from backend:", error);
-                document.getElementById('loading-state').innerHTML = `<p class="text-danger">Error connecting to the server. Please check the API_URL and make sure your backend is running.</p>`;
-            } finally {
-                loadingState.classList.add('d-none');
-                appContent.classList.remove('d-none');
-            }
-        }
-        
-        async function saveData() {
-            try {
-                await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        weekId: currentWeekId,
-                        schedule: studentSchedule, 
-                        attendance: attendanceRecords,
-                        extraClasses: extraClasses
-                    }),
-                });
-            } catch (error) {
-                console.error("Failed to save data:", error);
-                alert("Could not save changes to the server.");
+                console.error("Could not load week data:", error);
+                alert("Could not load data for the selected week.");
             }
         }
 
+        async function saveData() {
+            try {
+                await fetch(`${API_BASE_URL}/data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ weekId: currentWeekId, schedule: studentSchedule, attendance: attendanceRecords, extraClasses }),
+                });
+                // Also refresh the overall summary after saving
+                const summaryRes = await fetch(`${API_BASE_URL}/summary`);
+                const summaryData = await summaryRes.json();
+                renderOverallSummary(summaryData);
+            } catch (error) {
+                console.error("Failed to save data:", error);
+            }
+        }
+
+        // --- INITIALIZATION ---
         function init() {
             classActionModal = new bootstrap.Modal(document.getElementById('class-action-modal'));
+            
             document.getElementById('prev-week').onclick = () => {
                 currentDate.setDate(currentDate.getDate() - 7);
                 loadDataForWeek();
@@ -457,7 +449,7 @@
                 loadDataForWeek();
             };
             
-            loadDataForWeek();
+            loadInitialData();
         }
 
         init();
